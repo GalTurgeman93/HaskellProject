@@ -2,14 +2,8 @@ import Prelude hiding (Right, Left)
 import Data.Maybe (mapMaybe)
 
 example = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,14,15,0]]
-example2 = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,15,14,0]]
-example3 = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [14,15,13,0]]
-
+example2 =  [[6,9,7,4], [2,5,10,8], [3,11,1,12], [13,14,15,0]]
 example_new = [[0,1,2,3], [5,6,7,4], [9,10,11,8], [13,14,15,12]]
-
--- example4 = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,14,0,15]]
-
-
 
 ---------------------------------------------------- Definitions -----------------------------------------
 
@@ -29,6 +23,22 @@ data Puzzle = Puzzle
 data Direction = Up | Right | Down | Left
 type MovesQueue = [(Int,Puzzle)]
 
+--------------------------------------------- Defining Instances ---------------------------------------------
+
+instance Functor Row where  
+    fmap f Empty = Empty
+    fmap f (Val x xs) = Val (f x) (fmap f xs)
+
+instance Applicative Row where
+    pure a = Val a Empty
+    (<*>) Empty _ = Empty
+    (<*>) _ Empty = Empty
+    (<*>) (Val f next) (Val a next') = Val (f a) (next <*> next')
+
+-- instance Monad Row where
+--     return a = pure a
+--     (>>=) Empty f = Empty
+--     (>>=) (Val x next) f = (>>=) next f)
 
 -------------------------------------------- Building the Components -----------------------------------------
 
@@ -44,36 +54,31 @@ createPuzzle :: [[Integer]] -> Position -> Puzzle
 createPuzzle xs blankPos = Puzzle board dist dim blank moves Nothing
   where
     board = createBoard xs (0,0)
-    -- blank = (length xs-1, length (head xs)-1) 
     blank = blankPos
     dim = length xs
-    dist = boardDist board (0,0) dim
+    dist = getDist (boardDist board (0,0) (length xs))
     moves = 0
-
---------------------------------------------- Defining Instances ---------------------------------------------
-
-instance Functor Row where  
-    fmap f Empty = Empty
-    fmap f (Val x xs) = Val (f x) (fmap f xs)
-
 
 ----------------------------------------------- Defining Heuirstic -------------------------------------------
 
-manhattanDist :: Integer -> Position -> Int -> Int
-manhattanDist value (pos1, pos2) dim = if value == 0 then 0 else result
+getDist :: Row Integer -> Int
+getDist (Val v next) = fromInteger v
+
+boardDist :: Board -> Position -> Int -> Row Integer
+boardDist [] _ _ = Val 0 Empty
+boardDist (x:xs) (p1,p2) dim = ((+) <$> (rowDist x (p1,p2) dim) <*> (boardDist xs (p1+1, p2) dim))
+
+rowDist :: Row Integer -> Position -> Int -> Row Integer 
+rowDist Empty _ _ = Val 0 Empty
+rowDist (Val v next) (p1, p2) dim = ((+) <$> (manhattanDist v (p1,p2) dim) <*> (rowDist next (p1, p2+1) dim))
+
+manhattanDist :: Integer -> Position -> Int -> Row Integer
+manhattanDist value (pos1, pos2) dim = if value == 0 then (Val 0 Empty) else result
     where
         v = fromInteger value
         rowDist = abs (pos1 - ((v-1) `div` dim))
         colDist = abs (pos2 - ((v-1) `mod` dim))
-        result = rowDist + colDist
-
-boardDist :: Board -> Position -> Int -> Int
-boardDist [] _ _ = 0
-boardDist (x:xs) (p1, p2) dim = (rowDist x (p1, p2) dim) + (boardDist xs (p1+1, p2) dim)
-
-rowDist :: Row Integer -> Position -> Int -> Int
-rowDist Empty _  _ = 0
-rowDist (Val v next) (p1, p2) dim = (manhattanDist v (p1,p2) dim) + (rowDist next (p1, p2+1) dim)
+        result = Val (toInteger (rowDist + colDist)) Empty
 
 ----------------------------------------------- Updating after a move -----------------------------------------
 
@@ -112,7 +117,7 @@ update :: Puzzle -> Position -> Puzzle
 update p pos = p { board = newBoard
                  , blank = pos
                  , dim = dim p
-                 , dist = boardDist newBoard (0,0) (dim p)
+                 , dist = getDist (boardDist newBoard (0,0) (dim p))
                  , moves = moves p + 1
                  , previous = Just p 
              }
@@ -120,6 +125,8 @@ update p pos = p { board = newBoard
             board' = board p
             blank' = blank p
             newBoard = swapTiles board' blank' pos
+
+---------------------------------------------- Solve Process -----------------------------------------------            
 
 -- return the board that can be reached from the current board by moving in the given direction
 neighbors :: Puzzle -> [Puzzle]
@@ -150,20 +157,6 @@ insertQueue :: [(Int, Puzzle)] -> MovesQueue -> MovesQueue
 insertQueue [] q = q
 insertQueue (x:xs) q = insertQueue xs (insertPuzzle x q)
 
--- solve the givan puzzle
--- solve :: MovesQueue -> Puzzle
--- solve queueMoves =  if dist puzzle == 0 
---                     then puzzle 
---                     else solve newQueueMoves
---                     where
---                         (_,puzzle) = head queueMoves
---                         ns = case (previous puzzle) of
---                                     Nothing -> neighbors puzzle
---                                     Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
---                         ps  = zip [moves q + dist q | q <- ns] ns
---                         queueMoves = removeMin queueMoves
---                         newQueueMoves = insertQueue ps queueMoves
-
 solve :: MovesQueue -> Puzzle
 solve queueMoves =  if dist puzzle == 0 
                     then puzzle 
@@ -193,19 +186,6 @@ rowToString (Val 0 row) = "_" ++ (rowToString row)
 rowToString (Val x row) = (show x) ++  " " ++ (rowToString row)
 
 -------------------------------------------------- Main -------------------------------------------------
-
-solve' :: MovesQueue -> IO()
-solve' queueMoves =  if dist puzzle == 0 
-                    then print (moves puzzle) 
-                    else print (moves (solve newQueueMoves))
-                    where
-                        (_,puzzle) = head queueMoves
-                        ns = case (previous puzzle) of
-                                    Nothing -> neighbors puzzle
-                                    Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
-                        ps  = zip [moves q + dist q | q <- ns] ns
-                        queueMoves' = removeMin queueMoves
-                        newQueueMoves = insertQueue ps queueMoves'
 
 checkSol =  do 
       -- let puzzle = createPuzzle example_new
