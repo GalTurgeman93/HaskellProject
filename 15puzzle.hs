@@ -2,6 +2,15 @@ import Prelude hiding (Right, Left)
 import Data.Maybe (mapMaybe)
 
 example = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,14,15,0]]
+example2 = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,15,14,0]]
+example3 = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [14,15,13,0]]
+
+example_new = [[0,1,2,3], [5,6,7,4], [9,10,11,8], [13,14,15,12]]
+
+-- example4 = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,14,0,15]]
+
+
+
 ---------------------------------------------------- Definitions -----------------------------------------
 
 data Row a = Empty | Val a (Row a) deriving (Show, Ord, Eq)
@@ -31,11 +40,12 @@ createRow :: [Integer] -> Position -> Row Integer
 createRow [] _ = Empty
 createRow (x:xs) (p1,p2) = Val x (createRow xs (p1, p2+1))
 
-createPuzzle :: [[Integer]] -> Puzzle
-createPuzzle xs = Puzzle board dist dim blank moves Nothing
+createPuzzle :: [[Integer]] -> Position -> Puzzle
+createPuzzle xs blankPos = Puzzle board dist dim blank moves Nothing
   where
     board = createBoard xs (0,0)
-    blank = (length xs-1, length (head xs)-1) 
+    -- blank = (length xs-1, length (head xs)-1) 
+    blank = blankPos
     dim = length xs
     dist = boardDist board (0,0) dim
     moves = 0
@@ -53,8 +63,8 @@ manhattanDist :: Integer -> Position -> Int -> Int
 manhattanDist value (pos1, pos2) dim = if value == 0 then 0 else result
     where
         v = fromInteger value
-        rowDist = abs (pos1-1 - ((v-1) `div` dim))
-        colDist = abs (pos2-1 - ((v-1) `mod` dim))
+        rowDist = abs (pos1 - ((v-1) `div` dim))
+        colDist = abs (pos2 - ((v-1) `mod` dim))
         result = rowDist + colDist
 
 boardDist :: Board -> Position -> Int -> Int
@@ -136,20 +146,36 @@ insertPuzzle (priority,puzzle) ((xpriority,xpuzzle):xs)
 removeMin :: MovesQueue -> MovesQueue
 removeMin queueMoves = tail queueMoves
 
+insertQueue :: [(Int, Puzzle)] -> MovesQueue -> MovesQueue
+insertQueue [] q = q
+insertQueue (x:xs) q = insertQueue xs (insertPuzzle x q)
 
 -- solve the givan puzzle
+-- solve :: MovesQueue -> Puzzle
+-- solve queueMoves =  if dist puzzle == 0 
+--                     then puzzle 
+--                     else solve newQueueMoves
+--                     where
+--                         (_,puzzle) = head queueMoves
+--                         ns = case (previous puzzle) of
+--                                     Nothing -> neighbors puzzle
+--                                     Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
+--                         ps  = zip [moves q + dist q | q <- ns] ns
+--                         queueMoves = removeMin queueMoves
+--                         newQueueMoves = insertQueue ps queueMoves
+
 solve :: MovesQueue -> Puzzle
 solve queueMoves =  if dist puzzle == 0 
                     then puzzle 
-                    else solve newPuzzle
+                    else solve newQueueMoves
                     where
                         (_,puzzle) = head queueMoves
                         ns = case (previous puzzle) of
                                     Nothing -> neighbors puzzle
                                     Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
                         ps  = zip [moves q + dist q | q <- ns] ns
-                        newQueueMoves = foldr insertPuzzle queueMoves ps
-                        newPuzzle = removeMin newQueueMoves
+                        queueMoves' = removeMin queueMoves
+                        newQueueMoves = insertQueue ps queueMoves'
 
    
 -------------------------------------------------- Print ------------------------------------------------
@@ -168,12 +194,30 @@ rowToString (Val x row) = (show x) ++  " " ++ (rowToString row)
 
 -------------------------------------------------- Main -------------------------------------------------
 
+solve' :: MovesQueue -> IO()
+solve' queueMoves =  if dist puzzle == 0 
+                    then print (moves puzzle) 
+                    else print (moves (solve newQueueMoves))
+                    where
+                        (_,puzzle) = head queueMoves
+                        ns = case (previous puzzle) of
+                                    Nothing -> neighbors puzzle
+                                    Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
+                        ps  = zip [moves q + dist q | q <- ns] ns
+                        queueMoves' = removeMin queueMoves
+                        newQueueMoves = insertQueue ps queueMoves'
+
 checkSol =  do 
+      -- let puzzle = createPuzzle example_new
+      -- let queue = [((dist puzzle),puzzle)]
+      -- let result = solve' queue
+      -- solve' queue
+
+
 	let result = solve queue
 		where 
-			puzzle = createPuzzle example
+			puzzle = createPuzzle example_new (0,0)
 			queue = [((dist puzzle),puzzle)]
-	print (dim result)
 	printBoard (board result)
 
 main = checkSol
