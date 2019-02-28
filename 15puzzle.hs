@@ -169,10 +169,11 @@ rowToString (Val x row) = (show x) ++  " " ++ (rowToString row)
 -------------------------------------------------- Main -------------------------------------------------
 
 checkSol =  do 
-    let result = solve queue
-        where 
-            puzzle = createPuzzle example
-            queue = [((dist puzzle),puzzle)]
-    printBoard (board result)
+	let result = solve queue
+		where 
+			puzzle = createPuzzle example
+			queue = [((dist puzzle),puzzle)]
+	print (dim result)
+	printBoard (board result)
 
---main = checkSol
+main = checkSol
