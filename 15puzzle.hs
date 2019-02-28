@@ -1,3 +1,6 @@
+import Prelude hiding (Right, Left)
+import Data.Maybe (mapMaybe)
+
 example = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,14,15,0]]
 ---------------------------------------------------- Definitions -----------------------------------------
 
@@ -14,8 +17,8 @@ data Puzzle = Puzzle
   , previous  :: Maybe Puzzle 
   } deriving (Show, Eq, Ord)
 
-data Direction = North | East | South | West
-type MovesQueue = [Puzzle]
+data Direction = Up | Right | Down | Left
+type MovesQueue = [(Int,Puzzle)]
 
 
 -------------------------------------------- Building the Components -----------------------------------------
@@ -48,11 +51,11 @@ instance Functor Row where
 
 manhattanDist :: Integer -> Position -> Int -> Int
 manhattanDist value (pos1, pos2) dim = if value == 0 then 0 else result
-	 where
-		v = fromInteger value
-  		rowDist = abs (pos1-1 - ((v-1) `div` dim))
-  		colDist = abs (pos2-1 - ((v-1) `mod` dim))
-  		result = rowDist + colDist
+    where
+        v = fromInteger value
+        rowDist = abs (pos1-1 - ((v-1) `div` dim))
+        colDist = abs (pos2-1 - ((v-1) `mod` dim))
+        result = rowDist + colDist
 
 boardDist :: Board -> Position -> Int -> Int
 boardDist [] _ _ = 0
@@ -94,6 +97,7 @@ swapTiles board pos1 pos2 = setBoard (setBoard board pos2 val1) pos1 val2
         val1 = getTile board pos1
         val2 = getTile board pos2
 
+-- update the puzzle structure after the board changed by swap tiles
 update :: Puzzle -> Position -> Puzzle
 update p pos = p { board = newBoard
                  , blank = pos
@@ -103,28 +107,59 @@ update p pos = p { board = newBoard
                  , previous = Just p 
              }
         where
-        	board' = board p
-        	blank' = blank p
-        	newBoard = swapTiles board' blank' pos
+            board' = board p
+            blank' = blank p
+            newBoard = swapTiles board' blank' pos
+
+-- return the board that can be reached from the current board by moving in the given direction
+neighbors :: Puzzle -> [Puzzle]
+neighbors p = mapMaybe (neighbor p) [Up, Right, Down, Left]
+
+neighbor :: Puzzle -> Direction -> Maybe Puzzle
+neighbor p dir = case dir of
+    Up -> if i <= 0   then Nothing else Just $ update p ((i-1), j)
+    Right -> if j >= n-1 then Nothing else Just $ update p (i, (j+1))
+    Down -> if i >= n-1 then Nothing else Just $ update p ((i+1), j)
+    Left -> if j <= 0   then Nothing else Just $ update p (i, (j-1))
+    where
+        (i, j) = blank p
+        n = dim p
+
+--insert to the list of moves (the list is sorted by the priority)
+--The priority of a puzzle is the number of moves so far plus the manhattan distance.
+insertPuzzle :: (Int,Puzzle) -> MovesQueue -> MovesQueue
+insertPuzzle pair [] = [(pair)]
+insertPuzzle (priority,puzzle) ((xpriority,xpuzzle):xs) 
+        | (priority <= xpriority) = (priority,puzzle) : (xpriority,xpuzzle) : xs
+        | otherwise = (xpriority,xpuzzle) : (insertPuzzle (priority,puzzle) xs)
+
+removeMin :: MovesQueue -> MovesQueue
+removeMin queueMoves = tail queueMoves
 
 
+-- solve the givan puzzle
 solve :: MovesQueue -> Puzzle
 solve queueMoves =  if dist puzzle == 0 
-            			then puzzle 
-            			else puzzle
-  					where
-  						puzzle = head queueMoves
+                    then puzzle 
+                    else solve newPuzzle
+                    where
+                        (_,puzzle) = head queueMoves
+                        ns = case (previous puzzle) of
+                                    Nothing -> neighbors puzzle
+                                    Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
+                        ps  = zip [moves q + dist q | q <- ns] ns
+                        newQueueMoves = foldr insertPuzzle queueMoves ps
+                        newPuzzle = removeMin newQueueMoves
+
    
-
-
 -------------------------------------------------- Print ------------------------------------------------
 
 --print board
 printBoard :: Board -> IO()
 printBoard [] = putStrLn $ show ""
 printBoard (x:xs) = do 
-					putStrLn $ show (rowToString x)
-					printBoard xs
+                    putStrLn $ show (rowToString x)
+                    printBoard xs
 
 rowToString:: Row Integer -> String
 rowToString Empty = ""
@@ -134,11 +169,10 @@ rowToString (Val x row) = (show x) ++  " " ++ (rowToString row)
 -------------------------------------------------- Main -------------------------------------------------
 
 checkSol =  do 
-	let result = solve queue
-		where 
-			puzzle = createPuzzle example
-			queue = [puzzle]
-	print (dim result)
-	printBoard (board result)
+    let result = solve queue
+        where 
+            puzzle = createPuzzle example
+            queue = [((dist puzzle),puzzle)]
+    printBoard (board result)
 
-main = checkSol
+--main = checkSol
