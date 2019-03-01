@@ -3,7 +3,9 @@ import Data.Maybe (mapMaybe)
 
 example = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,14,15,0]]
 example2 =  [[6,9,7,4], [2,5,10,8], [3,11,1,12], [13,14,15,0]]
+example3 = [[2,3,7,4], [1,6,11,8],[5,10,0,12], [9,13,14,15]]
 example_new = [[0,1,2,3], [5,6,7,4], [9,10,11,8], [13,14,15,12]]
+
 
 ---------------------------------------------------- Definitions -----------------------------------------
 
@@ -35,10 +37,12 @@ instance Applicative Row where
     (<*>) _ Empty = Empty
     (<*>) (Val f next) (Val a next') = Val (f a) (next <*> next')
 
--- instance Monad Row where
---     return a = pure a
---     (>>=) Empty f = Empty
---     (>>=) (Val x next) f = (>>=) next f)
+instance Monad Row where
+    return a = pure a
+    (>>=) Empty f = Empty
+    (>>=) (Val x next) f = Val (res) ((>>=) next f)
+              where
+                (Val res next') = f x
 
 -------------------------------------------- Building the Components -----------------------------------------
 
@@ -70,10 +74,10 @@ boardDist (x:xs) (p1,p2) dim = ((+) <$> (rowDist x (p1,p2) dim) <*> (boardDist x
 
 rowDist :: Row Integer -> Position -> Int -> Row Integer 
 rowDist Empty _ _ = Val 0 Empty
-rowDist (Val v next) (p1, p2) dim = ((+) <$> (manhattanDist v (p1,p2) dim) <*> (rowDist next (p1, p2+1) dim))
+rowDist (Val v next) (p1, p2) dim = ((+) <$> ((>>=) (Val v next) (manhattanDist (p1,p2) dim)) <*> (rowDist next (p1, p2+1) dim))
 
-manhattanDist :: Integer -> Position -> Int -> Row Integer
-manhattanDist value (pos1, pos2) dim = if value == 0 then (Val 0 Empty) else result
+manhattanDist :: Position -> Int -> Integer -> Row Integer
+manhattanDist (pos1, pos2) dim value = if value == 0 then (Val 0 Empty) else result
     where
         v = fromInteger value
         rowDist = abs (pos1 - ((v-1) `div` dim))
@@ -147,8 +151,8 @@ neighbor p dir = case dir of
 insertPuzzle :: (Int,Puzzle) -> MovesQueue -> MovesQueue
 insertPuzzle pair [] = [(pair)]
 insertPuzzle (priority,puzzle) ((xpriority,xpuzzle):xs) 
-        | (priority <= xpriority) = (priority,puzzle) : (xpriority,xpuzzle) : xs
-        | otherwise = (xpriority,xpuzzle) : (insertPuzzle (priority,puzzle) xs)
+        | (priority > xpriority) = (xpriority,xpuzzle) : (insertPuzzle (priority,puzzle) xs)
+        | otherwise = (priority,puzzle) : (xpriority,xpuzzle) : xs
 
 removeMin :: MovesQueue -> MovesQueue
 removeMin queueMoves = tail queueMoves
@@ -187,8 +191,31 @@ rowToString (Val x row) = (show x) ++  " " ++ (rowToString row)
 
 -------------------------------------------------- Main -------------------------------------------------
 
+-- solve' :: MovesQueue -> IO()
+-- solve' queueMoves =  do
+                    -- print (head queueMoves)
+                    -- solve' (tail queueMoves)
+
+solve' :: MovesQueue -> IO()
+solve' queueMoves = do 
+                    print (map fst queueMoves)
+                    -- print (dist (snd (head queueMoves)))
+                    -- printBoard (board (snd (head queueMoves)))
+                    print (" ============================")
+                    if dist puzzle == 0 
+                    then print ""
+                    else solve' newQueueMoves
+                    where
+                        (_,puzzle) = head queueMoves
+                        ns = case (previous puzzle) of
+                                    Nothing -> neighbors puzzle
+                                    Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
+                        ps  = zip [moves q + dist q | q <- ns] ns
+                        queueMoves' = removeMin queueMoves
+                        newQueueMoves = insertQueue ps queueMoves'
+
 checkSol =  do 
-      -- let puzzle = createPuzzle example_new
+      -- let puzzle = createPuzzle example3 (2,2)
       -- let queue = [((dist puzzle),puzzle)]
       -- let result = solve' queue
       -- solve' queue
