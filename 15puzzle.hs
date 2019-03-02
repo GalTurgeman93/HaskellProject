@@ -10,7 +10,7 @@ example_new = [[0,1,2,3], [5,6,7,4], [9,10,11,8], [13,14,15,12]]
 ---------------------------------------------------- Definitions -----------------------------------------
 
 data Row a = Empty | Val a (Row a) deriving (Show, Ord, Eq)
-type Board = [Row Integer]
+type Board = [Row Int]
 type Position = (Int, Int) 
 
 data Puzzle = Puzzle 
@@ -46,15 +46,15 @@ instance Monad Row where
 
 -------------------------------------------- Building the Components -----------------------------------------
 
-createBoard :: [[Integer]] -> Position -> Board
+createBoard :: [[Int]] -> Position -> Board
 createBoard [] _ = []
 createBoard (x:xs) (p1,p2) = [createRow x (p1,p2)] ++ createBoard xs (p1+1, p2)
 
-createRow :: [Integer] -> Position -> Row Integer
+createRow :: [Int] -> Position -> Row Int
 createRow [] _ = Empty
 createRow (x:xs) (p1,p2) = Val x (createRow xs (p1, p2+1))
 
-createPuzzle :: [[Integer]] -> Position -> Puzzle
+createPuzzle :: [[Int]] -> Position -> Puzzle
 createPuzzle xs blankPos = Puzzle board dist dim blank moves Nothing
   where
     board = createBoard xs (0,0)
@@ -65,45 +65,45 @@ createPuzzle xs blankPos = Puzzle board dist dim blank moves Nothing
 
 ----------------------------------------------- Defining Heuirstic -------------------------------------------
 
-getDist :: Row Integer -> Int
-getDist (Val v next) = fromInteger v
+getDist :: Row Int -> Int
+getDist (Val v next) = v
 
-boardDist :: Board -> Position -> Int -> Row Integer
+boardDist :: Board -> Position -> Int -> Row Int
 boardDist [] _ _ = Val 0 Empty
 boardDist (x:xs) (p1,p2) dim = ((+) <$> (rowDist x (p1,p2) dim) <*> (boardDist xs (p1+1, p2) dim))
 
-rowDist :: Row Integer -> Position -> Int -> Row Integer 
+rowDist :: Row Int -> Position -> Int -> Row Int 
 rowDist Empty _ _ = Val 0 Empty
 rowDist (Val v next) (p1, p2) dim = ((+) <$> ((>>=) (Val v next) (manhattanDist (p1,p2) dim)) <*> (rowDist next (p1, p2+1) dim))
 
-manhattanDist :: Position -> Int -> Integer -> Row Integer
+manhattanDist :: Position -> Int -> Int -> Row Int
 manhattanDist (pos1, pos2) dim value = if value == 0 then (Val 0 Empty) else result
     where
-        v = fromInteger value
-        rowDist = abs (pos1 - ((v-1) `div` dim))
-        colDist = abs (pos2 - ((v-1) `mod` dim))
-        result = Val (toInteger (rowDist + colDist)) Empty
+        --v = fromInt value
+        rowDist = abs (pos1 - ((value-1) `div` dim))
+        colDist = abs (pos2 - ((value-1) `mod` dim))
+        result = Val (rowDist + colDist) Empty
 
 ----------------------------------------------- Updating after a move -----------------------------------------
 
 -- returns the tile value at the given position
-getTile :: Board -> Position -> Integer
+getTile :: Board -> Position -> Int
 getTile (x:xs) (0, pos2) = getTile' x (0, pos2)
 getTile (x:xs) (pos1, pos2) = getTile xs (pos1 - 1, pos2)
 
 -- returns the tile at the given position
-getTile' :: Row Integer -> Position -> Integer
+getTile' :: Row Int -> Position -> Int
 getTile' Empty (pos1, pos2) = -1
 getTile' (Val x row) (pos1, 0) = x
 getTile' (Val x row) (pos1, pos2) = getTile' row (pos1, pos2-1)
 
 --set value in the given position
-setBoard :: Board -> Position -> Integer -> Board
+setBoard :: Board -> Position -> Int -> Board
 setBoard [] _ _ = []  
 setBoard (x:xs) (0,pos2) newVal = [(setRow x (0,pos2) newVal)] ++ xs
 setBoard (x:xs) (pos1,pos2) newVal = [x] ++ (setBoard xs (pos1-1,pos2) newVal)
 
-setRow :: Row Integer -> Position -> Integer -> Row Integer
+setRow :: Row Int -> Position -> Int -> Row Int
 setRow Empty _ _ = Empty
 setRow (Val y row) (pos1,0) x = (Val x row)
 setRow (Val y row) (pos1,pos2) x = (Val y (setRow row (pos1,pos2-1) x))
@@ -184,7 +184,7 @@ printBoard (x:xs) = do
                     putStrLn $ show (rowToString x)
                     printBoard xs
 
-rowToString:: Row Integer -> String
+rowToString:: Row Int -> String
 rowToString Empty = ""
 rowToString (Val 0 row) = "_" ++ (rowToString row)
 rowToString (Val x row) = (show x) ++  " " ++ (rowToString row)
@@ -214,17 +214,25 @@ solve' queueMoves = do
                         queueMoves' = removeMin queueMoves
                         newQueueMoves = insertQueue ps queueMoves'
 
-checkSol =  do 
-      -- let puzzle = createPuzzle example3 (2,2)
-      -- let queue = [((dist puzzle),puzzle)]
-      -- let result = solve' queue
-      -- solve' queue
-
-
+checkSol :: Position -> [[Int]] -> IO()
+checkSol pos matrix =  do 
 	let result = solve queue
 		where 
-			puzzle = createPuzzle example_new (0,0)
+			puzzle = createPuzzle matrix pos
 			queue = [((dist puzzle),puzzle)]
 	printBoard (board result)
 
-main = checkSol
+
+fromString :: String -> [[Int]]
+fromString s = (map . map) read ws
+  where ws = map words (lines s)
+
+main = do
+    putStrLn "Enter the name of the file containing the puzzle:"
+    txt <- readFile =<< getLine
+    let game = fromString txt
+        ([p1,p2], brd) = case game of
+          [] -> error "Invalid puzzle file"
+          x:xs -> (x, xs)
+	
+    checkSol (p1,p2) brd
