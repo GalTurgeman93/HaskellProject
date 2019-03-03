@@ -26,6 +26,14 @@ data Direction = Up | Right | Down | Left
 type MovesQueue = [(Int,Puzzle)]
 
 --------------------------------------------- Defining Instances ---------------------------------------------
+instance Semigroup (Row a) where
+   (<>) a b = mappend a b 
+
+instance Monoid (Row a) where
+    mempty = Empty
+    mappend a Empty = a
+    mappend Empty b = b
+    mappend (Val a next) b = Val a (mappend next b)  
 
 instance Functor Row where  
     fmap f Empty = Empty
@@ -79,7 +87,6 @@ rowDist (Val v next) (p1, p2) dim = ((+) <$> ((>>=) (Val v next) (manhattanDist 
 manhattanDist :: Position -> Int -> Int -> Row Int
 manhattanDist (pos1, pos2) dim value = if value == 0 then (Val 0 Empty) else result
     where
-        --v = fromInt value
         rowDist = abs (pos1 - ((value-1) `div` dim))
         colDist = abs (pos2 - ((value-1) `mod` dim))
         result = Val (rowDist + colDist) Empty
@@ -190,29 +197,6 @@ rowToString (Val 0 row) = "_" ++ (rowToString row)
 rowToString (Val x row) = (show x) ++  " " ++ (rowToString row)
 
 -------------------------------------------------- Main -------------------------------------------------
-
--- solve' :: MovesQueue -> IO()
--- solve' queueMoves =  do
-                    -- print (head queueMoves)
-                    -- solve' (tail queueMoves)
-
-solve' :: MovesQueue -> IO()
-solve' queueMoves = do 
-                    print (map fst queueMoves)
-                    -- print (dist (snd (head queueMoves)))
-                    -- printBoard (board (snd (head queueMoves)))
-                    print (" ============================")
-                    if dist puzzle == 0 
-                    then print ""
-                    else solve' newQueueMoves
-                    where
-                        (_,puzzle) = head queueMoves
-                        ns = case (previous puzzle) of
-                                    Nothing -> neighbors puzzle
-                                    Just n  -> filter (\x -> board x /= board n) (neighbors puzzle)
-                        ps  = zip [moves q + dist q | q <- ns] ns
-                        queueMoves' = removeMin queueMoves
-                        newQueueMoves = insertQueue ps queueMoves'
 
 checkSol :: Position -> [[Int]] -> IO()
 checkSol pos matrix =  do 
