@@ -117,11 +117,17 @@ setRow (Val y row) (pos1,pos2) x = (Val y (setRow row (pos1,pos2-1) x))
 
 
 -- swap tiles at pos1 and pos 2 on board
-swapTiles :: Board -> Position -> Position -> Board
-swapTiles board pos1 pos2 = setBoard (setBoard board pos2 val1) pos1 val2
-    where
-        val1 = getTile board pos1
-        val2 = getTile board pos2
+--swapTiles :: Board -> Position -> Position -> Board
+--swapTiles board pos1 pos2 = setBoard (setBoard board pos2 val1) pos1 val2
+--    where
+--        val1 = getTile board pos1
+--        val2 = getTile board pos2
+
+swapTiles :: Board -> Position -> Position -> Board   --using laziness
+swapTiles board pos1 pos2 = 
+        let values = (getTile board pos1, getTile board pos2)
+            (val1, val2) = values
+		in setBoard (setBoard board pos2 val1) pos1 val2 
 
 -- update the puzzle structure after the board changed by swap tiles
 update :: Puzzle -> Position -> Puzzle
@@ -210,6 +216,7 @@ checkSol pos matrix =  do
 fromString :: String -> [[Int]]
 fromString s = (map . map) read ws
   where ws = map words (lines s)
+  
 
 main = do
     putStrLn "Enter the name of the file containing the puzzle:"
