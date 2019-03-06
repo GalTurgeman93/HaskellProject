@@ -1,11 +1,6 @@
 import Prelude hiding (Right, Left)
 import Data.Maybe (mapMaybe)
 
-example = [[1,2,3, 4] ,[5,6,7,8],[9, 10, 11, 12], [13,14,15,0]]
-example2 =  [[6,9,7,4], [2,5,10,8], [3,11,1,12], [13,14,15,0]]
-example3 = [[2,3,7,4], [1,6,11,8],[5,10,0,12], [9,13,14,15]]
-example_new = [[0,1,2,3], [5,6,7,4], [9,10,11,8], [13,14,15,12]]
-
 
 ---------------------------------------------------- Definitions -----------------------------------------
 
@@ -25,7 +20,9 @@ data Puzzle = Puzzle
 data Direction = Up | Right | Down | Left
 type MovesQueue = [(Int,Puzzle)]
 
+
 --------------------------------------------- Defining Instances ---------------------------------------------
+
 instance Semigroup (Row a) where
    (<>) a b = mappend a b 
 
@@ -117,17 +114,12 @@ setRow (Val y row) (pos1,pos2) x = (Val y (setRow row (pos1,pos2-1) x))
 
 
 -- swap tiles at pos1 and pos 2 on board
---swapTiles :: Board -> Position -> Position -> Board
---swapTiles board pos1 pos2 = setBoard (setBoard board pos2 val1) pos1 val2
---    where
---        val1 = getTile board pos1
---        val2 = getTile board pos2
 
 swapTiles :: Board -> Position -> Position -> Board   --using laziness
 swapTiles board pos1 pos2 = 
         let values = (getTile board pos1, getTile board pos2)
             (val1, val2) = values
-		in setBoard (setBoard board pos2 val1) pos1 val2 
+        in setBoard (setBoard board pos2 val1) pos1 val2 
 
 -- update the puzzle structure after the board changed by swap tiles
 update :: Puzzle -> Position -> Puzzle
